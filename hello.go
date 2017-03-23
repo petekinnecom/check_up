@@ -106,9 +106,8 @@ func waitAll(services []Service, log func(string, int)) {
 
 	for !allUp {
 		allUp = checkAll(services, log)
-		log(fmt.Sprintf("got %v", allUp), 1)
 		if !allUp {
-			log("check again", 0)
+			log("retrying check up", 1)
 		}
 	}
 }
@@ -130,15 +129,15 @@ func loadFile(filePath string) []Service {
 	for name, spec := range yml["services"] {
 		timeout, err := strconv.Atoi(spec["timeout"])
 		if err != nil {
-			panic("could not parse timeout")
+			timeout = 3
 		}
 		retries, err := strconv.Atoi(spec["retries"])
 		if err != nil {
-			panic("could not parse retries")
+			retries = 0
 		}
 		interval, err := strconv.Atoi(spec["interval"])
 		if err != nil {
-			panic("could not parse interval")
+			interval = 1
 		}
 		services = append(services,
 			Service{
@@ -151,20 +150,43 @@ func loadFile(filePath string) []Service {
 	return services
 }
 
+func filterServices(services []Service, serviceNames []string) []Service {
+	if len(serviceNames) == 0 {
+		return services
+	} else {
+		selectedServices := make([]Service, 0)
+
+		for _, name := range serviceNames {
+			for _, service := range services {
+				if service.Name == name {
+					selectedServices = append(selectedServices, service)
+				}
+			}
+		}
+
+		return selectedServices
+	}
+}
+
 func main() {
 	filePathPtr := flag.String("file", "check_up.yml", "path to configuration yml")
 	waitPtr := flag.Bool("wait", false, "check services repeatedly until all are up")
+	verbosePtr := flag.Bool("verbose", false, "output more info")
 
 	flag.Parse()
 
-	log := Logger(1)
+	logLevel := 0
+	if *verbosePtr {
+		logLevel = 1
+	}
+
+	log := Logger(logLevel)
 	services := loadFile(*filePathPtr)
+	services = filterServices(services, flag.Args())
 
 	if *waitPtr {
-		log("waiting", 1)
 		waitAll(services, log)
 	} else {
-		log("not waiting", 1)
 		checkAll(services, log)
 	}
 }

@@ -6,9 +6,6 @@ services:
     timeout: 3
   down_service:
     command: test -f /tmp/pass
-    retries: 0
-    interval: 2
-    timeout: 1
   other_service:
     command: sleep 1
     retries: 1
