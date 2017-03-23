@@ -89,8 +89,11 @@ func checkAll(services []Service, log func(string, int)) bool {
 		go func(service Service) {
 			defer wg.Done()
 
-			// Thread safe?
-			allUp = allUp && CheckUp(service, log)
+			// Some crazy business here
+			// Don't know why this works with the extra assignment...
+			// Probably thread safety issue
+			up := CheckUp(service, log)
+			allUp = allUp && up
 		}(service)
 	}
 	wg.Wait()
@@ -103,6 +106,7 @@ func waitAll(services []Service, log func(string, int)) {
 
 	for !allUp {
 		allUp = checkAll(services, log)
+		log(fmt.Sprintf("got %v", allUp), 1)
 		if !allUp {
 			log("check again", 0)
 		}
@@ -149,10 +153,18 @@ func loadFile(filePath string) []Service {
 
 func main() {
 	filePathPtr := flag.String("file", "check_up.yml", "path to configuration yml")
+	waitPtr := flag.Bool("wait", false, "check services repeatedly until all are up")
+
 	flag.Parse()
 
 	log := Logger(1)
 	services := loadFile(*filePathPtr)
-	results := checkAll(services, log)
-	fmt.Printf("%v", results)
+
+	if *waitPtr {
+		log("waiting", 1)
+		waitAll(services, log)
+	} else {
+		log("not waiting", 1)
+		checkAll(services, log)
+	}
 }
