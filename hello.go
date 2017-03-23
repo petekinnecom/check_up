@@ -57,12 +57,12 @@ func CheckUp(serviceName string, spec map[string]string, unboundLog func(string,
 var data = `
 services:
   up_service:
-    command: sleep 3
+    command: sleep 2
     retries: 1
     interval: 2
     timeout: 3
   down_service:
-    command: sleep 2
+    command: test -f /tmp/pass
     retries: 1
     interval: 2
     timeout: 3
@@ -86,24 +86,48 @@ func Logger(logLevel int) func(string, int) {
 	}
 }
 
+func checkAll(servicesYml map[string]map[string]string, log func(string, int)) bool {
+	var wg sync.WaitGroup
+	wg.Add(len(servicesYml))
+
+	results := make(map[string]bool)
+
+	for serviceName, spec := range servicesYml {
+		go func(serviceName string, spec map[string]string) {
+			defer wg.Done()
+			results[serviceName] = CheckUp(serviceName, spec, log)
+		}(serviceName, spec)
+	}
+	wg.Wait()
+
+	var allUp bool
+	allUp = true
+	for _, isUp := range results {
+		allUp = allUp && isUp
+	}
+
+	return allUp
+}
+
+func waitAll(servicesYml map[string]map[string]string, log func(string, int)) {
+	allUp := false
+
+	for !allUp {
+		allUp = checkAll(servicesYml, log)
+		if !allUp {
+			log("check again", 0)
+		}
+	}
+}
+
 func main() {
 	yml := make(map[string]map[string]map[string]string)
-	log := Logger(1)
+	log := Logger(0)
 
 	err := yaml.Unmarshal([]byte(data), &yml)
 	if err != nil {
 		panic("error")
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(len(yml["services"]))
-
-	for serviceName, spec := range yml["services"] {
-		go func(serviceName string, spec map[string]string) {
-			defer wg.Done()
-			fmt.Printf("%v\n", serviceName)
-			CheckUp(serviceName, spec, log)
-		}(serviceName, spec)
-	}
-	wg.Wait()
+	waitAll(yml["services"], log)
 }
