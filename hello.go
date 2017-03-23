@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"gopkg.in/yaml.v2"
-	"log"
 	"os/exec"
 )
 
@@ -17,6 +16,18 @@ func Cmd(cmd string) bool {
 	return true
 }
 
+func CheckUp(serviceName string, spec map[string]string, log func(string, int)) bool {
+	up := Cmd(spec["command"])
+	if up {
+		log("up", 0)
+		return true
+	} else {
+		log("down", 0)
+		return false
+	}
+
+}
+
 var data = `
 services:
   up_service:
@@ -28,22 +39,32 @@ services:
     command: exit 1
 `
 
-func Logger(serviceName string) func(string) {
-	return func(msg string) {
-		fmt.Println("%v | '%v'\n", serviceName, msg)
+func ServiceLogger(serviceName string, logger func(string, int)) func(string, int) {
+	return func(msg string, level int) {
+		message := fmt.Sprintf("%v | %v", serviceName, msg)
+		logger(message, level)
+	}
+}
+
+func Logger(logLevel int) func(string, int) {
+	return func(msg string, msgLevel int) {
+		if msgLevel <= logLevel {
+			fmt.Printf("%v'\n", msg)
+		}
 	}
 }
 
 func main() {
 	yml := make(map[string]map[string]map[string]string)
+	log := Logger(1)
 
 	err := yaml.Unmarshal([]byte(data), &yml)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		panic("error")
 	}
 
-	for name, test := range yml["services"] {
-		isUp := Cmd(test["command"])
-		fmt.Printf("service: %v, up? '%v'\n", name, isUp)
+	for serviceName, spec := range yml["services"] {
+		serviceLog := ServiceLogger(serviceName, log)
+		CheckUp(serviceName, spec, serviceLog)
 	}
 }
