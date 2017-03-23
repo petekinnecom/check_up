@@ -5,6 +5,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"os/exec"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -35,7 +36,8 @@ func Cmd(command string, timeout int, log func(string, int)) bool {
 	}
 }
 
-func CheckUp(serviceName string, spec map[string]string, log func(string, int)) bool {
+func CheckUp(serviceName string, spec map[string]string, unboundLog func(string, int)) bool {
+	log := ServiceLogger(serviceName, unboundLog)
 	timeout, err := strconv.Atoi(spec["timeout"])
 	if err != nil {
 		panic("failed to parse timeout")
@@ -55,7 +57,7 @@ func CheckUp(serviceName string, spec map[string]string, log func(string, int)) 
 var data = `
 services:
   up_service:
-    command: exit 0
+    command: sleep 3
     retries: 1
     interval: 2
     timeout: 3
@@ -63,6 +65,9 @@ services:
     command: sleep 2
     retries: 1
     interval: 2
+    timeout: 3
+  other_service:
+    command: sleep 1
     timeout: 3
 `
 
@@ -90,8 +95,15 @@ func main() {
 		panic("error")
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(len(yml["services"]))
+
 	for serviceName, spec := range yml["services"] {
-		serviceLog := ServiceLogger(serviceName, log)
-		CheckUp(serviceName, spec, serviceLog)
+		go func(serviceName string, spec map[string]string) {
+			defer wg.Done()
+			fmt.Printf("%v\n", serviceName)
+			CheckUp(serviceName, spec, log)
+		}(serviceName, spec)
 	}
+	wg.Wait()
 }
