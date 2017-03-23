@@ -1,0 +1,16 @@
+services:
+  up_service:
+    command: sleep 1
+    retries: 1
+    interval: 2
+    timeout: 3
+  down_service:
+    command: sleep 2
+    retries: 3
+    interval: 2
+    timeout: 1
+  other_service:
+    command: sleep 1
+    retries: 1
+    interval: 2
+    timeout: 3

@@ -108,34 +108,13 @@ func waitAll(services []Service, log func(string, int)) {
 	}
 }
 
-var data = `
-services:
-  up_service:
-    command: sleep 1
-    retries: 1
-    interval: 2
-    timeout: 3
-  down_service:
-    command: sleep 2
-    retries: 3
-    interval: 2
-    timeout: 1
-  other_service:
-    command: sleep 1
-    retries: 1
-    interval: 2
-    timeout: 3
-`
-
-func main() {
+func loadFile(filePath string) []Service {
 	yml := make(map[string]map[string]map[string]string)
 
 	fileContents, err := ioutil.ReadFile("./check_up.yml")
 	if err != nil {
 		panic("couldn't read file")
 	}
-
-	log := Logger(1)
 
 	err = yaml.Unmarshal([]byte(fileContents), &yml)
 	if err != nil {
@@ -164,7 +143,12 @@ func main() {
 				Retries:  retries,
 				Interval: interval})
 	}
+	return services
+}
 
+func main() {
+	log := Logger(1)
+	services := loadFile("check_up.yml")
 	results := checkAll(services, log)
 	fmt.Printf("%v", results)
 }
