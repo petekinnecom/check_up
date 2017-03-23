@@ -19,9 +19,9 @@ type Service struct {
 	Interval int
 }
 
-func Cmd(command string, timeout int, log func(string, int)) bool {
+func execWithTimeout(command string, timeout int, log func(string, int)) bool {
 	// taken from: http://stackoverflow.com/a/27764262
-	log(fmt.Sprintf("`%v`", command), 1)
+	log(fmt.Sprintf("%v", command), 1)
 	cmd := exec.Command("bash", "-c", command)
 
 	cmd.Start()
@@ -50,7 +50,7 @@ func CheckUp(service Service, unboundLog func(string, int)) bool {
 	log := ServiceLogger(service.Name, unboundLog)
 	for i := 0; i <= service.Retries; i++ {
 		log("trying", 1)
-		up := Cmd(service.Command, service.Timeout, log)
+		up := execWithTimeout(service.Command, service.Timeout, log)
 		if up {
 			log("up", 1)
 			return true
