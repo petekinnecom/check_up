@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"log"
-
 	"gopkg.in/yaml.v2"
+	"log"
+	"os/exec"
 )
 
 type Service struct {
@@ -13,6 +13,15 @@ type Service struct {
 		RenamedC int   `yaml:"c"`
 		D        []int `yaml:",flow"`
 	}
+}
+
+func Cmd(cmd string) []byte {
+	out, err := exec.Command("bash", "-c", cmd).Output()
+	if err != nil {
+		fmt.Printf("err: %v", err)
+		panic("some error found")
+	}
+	return out
 }
 
 var data = `
@@ -37,5 +46,6 @@ func main() {
 	for name, test := range yml["services"] {
 		fmt.Printf("service: %v runs '%v'\n", name, test["command"])
 	}
-
+	out := Cmd("exit 0")
+	fmt.Printf("output: %v", out)
 }
