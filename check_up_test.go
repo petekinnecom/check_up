@@ -5,10 +5,11 @@ import (
 	"os/exec"
 	"regexp"
 	"testing"
+	"time"
 )
 
 type LogLine struct {
-	Msg string
+	Msg   string
 	Level int
 }
 
@@ -18,11 +19,16 @@ func log(s string, i int) {
 	logLines = append(logLines, LogLine{s, i})
 }
 
-func resetLog(){
+func resetLog() {
 	logLines = make([]LogLine, 0)
 }
 
-func assertLog(msg string, i int, t *testing.T){
+func randomIdentifier() string {
+	now := time.Now().Unix()
+	return fmt.Sprintf("%v", now)
+}
+
+func assertLog(msg string, i int, t *testing.T) {
 	for _, logLine := range logLines {
 		if logLine.Msg == msg && logLine.Level == i {
 			return
@@ -75,4 +81,51 @@ func TestExecWithTimeout__Timeout__ShouldKillProcess(t *testing.T) {
 	if matched {
 		t.Error("Sleep command should have been killed")
 	}
+}
+
+func TestCheckUp__up(t *testing.T) {
+	resetLog()
+	service := Service{
+		Name:     "serviceName",
+		Command:  "exit 0",
+		Retries:  0,
+		Timeout:  1,
+		Interval: 1}
+	up := CheckUp(service, log)
+	if !up {
+		t.Error("should be up")
+	}
+	assertLog("serviceName | up", 1, t)
+}
+
+func TestCheckUp__down(t *testing.T) {
+	resetLog()
+	service := Service{
+		Name:     "serviceName",
+		Command:  "exit 1",
+		Retries:  0,
+		Timeout:  1,
+		Interval: 1}
+	up := CheckUp(service, log)
+	if up {
+		t.Error("should be down")
+	}
+	assertLog("serviceName | down", 0, t)
+}
+
+func TestCheckUp__retry(t *testing.T) {
+	resetLog()
+	filePath := randomIdentifier()
+	service := Service{
+		Name:     "serviceName",
+		Command:  fmt.Sprintf("(test -f /tmp/%v && rm /tmp/%v) || (touch /tmp/%v && exit 1)", filePath, filePath, filePath),
+		Retries:  1,
+		Timeout:  1,
+		Interval: 1}
+	up := CheckUp(service, log)
+	if !up {
+		t.Error("should be up")
+	}
+	assertLog("serviceName | sleep 1 interval", 1, t)
+	assertLog("serviceName | up", 1, t)
 }

@@ -47,7 +47,11 @@ func execWithTimeout(command string, timeout int, log func(string, int)) bool {
 }
 
 func CheckUp(service Service, unboundLog func(string, int)) bool {
-	log := ServiceLogger(service.Name, unboundLog)
+	log := func(msg string, level int) {
+		message := fmt.Sprintf("%v | %v", service.Name, msg)
+		unboundLog(message, level)
+	}
+
 	for i := 0; i <= service.Retries; i++ {
 		log("trying", 1)
 		up := execWithTimeout(service.Command, service.Timeout, log)
@@ -62,13 +66,6 @@ func CheckUp(service Service, unboundLog func(string, int)) bool {
 
 	log("down", 0)
 	return false
-}
-
-func ServiceLogger(serviceName string, logger func(string, int)) func(string, int) {
-	return func(msg string, level int) {
-		message := fmt.Sprintf("%v | %v", serviceName, msg)
-		logger(message, level)
-	}
 }
 
 func Logger(logLevel int) func(string, int) {
