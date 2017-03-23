@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+type Service struct {
+	Name    string
+	Command string
+	Timeout int
+}
+
 func Cmd(command string, timeout int, log func(string, int)) bool {
 	// taken from: http://stackoverflow.com/a/27764262
 	log(fmt.Sprintf("`%v`", command), 1)
@@ -36,14 +42,9 @@ func Cmd(command string, timeout int, log func(string, int)) bool {
 	}
 }
 
-func CheckUp(serviceName string, spec map[string]string, unboundLog func(string, int)) bool {
-	log := ServiceLogger(serviceName, unboundLog)
-	timeout, err := strconv.Atoi(spec["timeout"])
-	if err != nil {
-		panic("failed to parse timeout")
-	}
-
-	up := Cmd(spec["command"], timeout, log)
+func CheckUp(service Service, unboundLog func(string, int)) bool {
+	log := ServiceLogger(service.Name, unboundLog)
+	up := Cmd(service.Command, service.Timeout, log)
 	if up {
 		log("up", 1)
 		return true
@@ -53,23 +54,6 @@ func CheckUp(serviceName string, spec map[string]string, unboundLog func(string,
 	}
 
 }
-
-var data = `
-services:
-  up_service:
-    command: sleep 2
-    retries: 1
-    interval: 2
-    timeout: 3
-  down_service:
-    command: test -f /tmp/pass
-    retries: 1
-    interval: 2
-    timeout: 3
-  other_service:
-    command: sleep 1
-    timeout: 3
-`
 
 func ServiceLogger(serviceName string, logger func(string, int)) func(string, int) {
 	return func(msg string, level int) {
@@ -86,17 +70,17 @@ func Logger(logLevel int) func(string, int) {
 	}
 }
 
-func checkAll(servicesYml map[string]map[string]string, log func(string, int)) bool {
+func checkAll(services []Service, log func(string, int)) bool {
 	var wg sync.WaitGroup
-	wg.Add(len(servicesYml))
+	wg.Add(len(services))
 
 	results := make(map[string]bool)
 
-	for serviceName, spec := range servicesYml {
-		go func(serviceName string, spec map[string]string) {
+	for _, service := range services {
+		go func(service Service) {
 			defer wg.Done()
-			results[serviceName] = CheckUp(serviceName, spec, log)
-		}(serviceName, spec)
+			results[service.Name] = CheckUp(service, log)
+		}(service)
 	}
 	wg.Wait()
 
@@ -109,25 +93,51 @@ func checkAll(servicesYml map[string]map[string]string, log func(string, int)) b
 	return allUp
 }
 
-func waitAll(servicesYml map[string]map[string]string, log func(string, int)) {
+func waitAll(services []Service, log func(string, int)) {
 	allUp := false
 
 	for !allUp {
-		allUp = checkAll(servicesYml, log)
+		allUp = checkAll(services, log)
 		if !allUp {
 			log("check again", 0)
 		}
 	}
 }
 
+var data = `
+services:
+  up_service:
+    command: sleep 1
+    retries: 1
+    interval: 2
+    timeout: 3
+  down_service:
+    command: test -f /tmp/pass
+    retries: 1
+    interval: 2
+    timeout: 3
+  other_service:
+    command: sleep 1
+    timeout: 3
+`
+
 func main() {
 	yml := make(map[string]map[string]map[string]string)
-	log := Logger(0)
+	log := Logger(1)
 
 	err := yaml.Unmarshal([]byte(data), &yml)
 	if err != nil {
 		panic("error")
 	}
 
-	waitAll(yml["services"], log)
+	services := make([]Service, 0)
+	for name, spec := range yml["services"] {
+		timeout, err := strconv.Atoi(spec["timeout"])
+		if err != nil {
+			panic("could not parse timeout")
+		}
+		services = append(services, Service{Name: name, Timeout: timeout, Command: spec["command"]})
+	}
+
+	checkAll(services, log)
 }
