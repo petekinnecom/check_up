@@ -7,21 +7,14 @@ import (
 	"os/exec"
 )
 
-type Service struct {
-	A string
-	B struct {
-		RenamedC int   `yaml:"c"`
-		D        []int `yaml:",flow"`
-	}
-}
-
-func Cmd(cmd string) []byte {
-	out, err := exec.Command("bash", "-c", cmd).Output()
+func Cmd(cmd string) bool {
+	// taken from: http://stackoverflow.com/a/27764262
+	_, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
-		fmt.Printf("err: %v", err)
-		panic("some error found")
+		fmt.Printf("err: %v\n", err)
+		return false
 	}
-	return out
+	return true
 }
 
 var data = `
@@ -35,6 +28,12 @@ services:
     command: exit 1
 `
 
+func Logger(serviceName string) func(string) {
+	return func(msg string) {
+		fmt.Println("%v | '%v'\n", serviceName, msg)
+	}
+}
+
 func main() {
 	yml := make(map[string]map[string]map[string]string)
 
@@ -44,8 +43,7 @@ func main() {
 	}
 
 	for name, test := range yml["services"] {
-		fmt.Printf("service: %v runs '%v'\n", name, test["command"])
+		isUp := Cmd(test["command"])
+		fmt.Printf("service: %v, up? '%v'\n", name, isUp)
 	}
-	out := Cmd("exit 0")
-	fmt.Printf("output: %v", out)
 }
