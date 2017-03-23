@@ -6,20 +6,21 @@ import (
 	"os/exec"
 )
 
-func Cmd(cmd string) bool {
+func Cmd(cmd string, log func(string, int)) bool {
 	// taken from: http://stackoverflow.com/a/27764262
+	log(fmt.Sprintf("`%v`", cmd), 1)
 	_, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
-		fmt.Printf("err: %v\n", err)
+		log(fmt.Sprintf("%v", err), 1)
 		return false
 	}
 	return true
 }
 
 func CheckUp(serviceName string, spec map[string]string, log func(string, int)) bool {
-	up := Cmd(spec["command"])
+	up := Cmd(spec["command"], log)
 	if up {
-		log("up", 0)
+		log("up", 1)
 		return true
 	} else {
 		log("down", 0)
@@ -49,14 +50,14 @@ func ServiceLogger(serviceName string, logger func(string, int)) func(string, in
 func Logger(logLevel int) func(string, int) {
 	return func(msg string, msgLevel int) {
 		if msgLevel <= logLevel {
-			fmt.Printf("%v'\n", msg)
+			fmt.Printf("%v\n", msg)
 		}
 	}
 }
 
 func main() {
 	yml := make(map[string]map[string]map[string]string)
-	log := Logger(1)
+	log := Logger(0)
 
 	err := yaml.Unmarshal([]byte(data), &yml)
 	if err != nil {
