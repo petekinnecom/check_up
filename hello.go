@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"gopkg.in/yaml.v2"
+	"io/ioutil"
 	"os/exec"
 	"strconv"
 	"sync"
@@ -53,7 +54,7 @@ func CheckUp(service Service, unboundLog func(string, int)) bool {
 			log("up", 1)
 			return true
 		} else if i < service.Retries {
-			log(fmt.Sprintf("sleep %v before retry", service.Interval), 1)
+			log(fmt.Sprintf("sleep %v interval", service.Interval), 1)
 			time.Sleep(time.Duration(service.Interval) * time.Second)
 		}
 	}
@@ -128,9 +129,15 @@ services:
 
 func main() {
 	yml := make(map[string]map[string]map[string]string)
+
+	fileContents, err := ioutil.ReadFile("./check_up.yml")
+	if err != nil {
+		panic("couldn't read file")
+	}
+
 	log := Logger(1)
 
-	err := yaml.Unmarshal([]byte(data), &yml)
+	err = yaml.Unmarshal([]byte(fileContents), &yml)
 	if err != nil {
 		panic("error")
 	}
