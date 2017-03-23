@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -111,7 +112,7 @@ func waitAll(services []Service, log func(string, int)) {
 func loadFile(filePath string) []Service {
 	yml := make(map[string]map[string]map[string]string)
 
-	fileContents, err := ioutil.ReadFile("./check_up.yml")
+	fileContents, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		panic("couldn't read file")
 	}
@@ -147,8 +148,11 @@ func loadFile(filePath string) []Service {
 }
 
 func main() {
+	filePathPtr := flag.String("file", "check_up.yml", "path to configuration yml")
+	flag.Parse()
+
 	log := Logger(1)
-	services := loadFile("check_up.yml")
+	services := loadFile(*filePathPtr)
 	results := checkAll(services, log)
 	fmt.Printf("%v", results)
 }
