@@ -10,9 +10,11 @@ import (
 )
 
 type Service struct {
-	Name    string
-	Command string
-	Timeout int
+	Name     string
+	Command  string
+	Timeout  int
+	Retries  int
+	Interval int
 }
 
 func Cmd(command string, timeout int, log func(string, int)) bool {
@@ -44,15 +46,20 @@ func Cmd(command string, timeout int, log func(string, int)) bool {
 
 func CheckUp(service Service, unboundLog func(string, int)) bool {
 	log := ServiceLogger(service.Name, unboundLog)
-	up := Cmd(service.Command, service.Timeout, log)
-	if up {
-		log("up", 1)
-		return true
-	} else {
-		log("down", 0)
-		return false
+	for i := 0; i <= service.Retries; i++ {
+		log("trying", 1)
+		up := Cmd(service.Command, service.Timeout, log)
+		if up {
+			log("up", 1)
+			return true
+		} else if i < service.Retries {
+			log(fmt.Sprintf("sleep %v before retry", service.Interval), 1)
+			time.Sleep(time.Duration(service.Interval) * time.Second)
+		}
 	}
 
+	log("down", 0)
+	return false
 }
 
 func ServiceLogger(serviceName string, logger func(string, int)) func(string, int) {
@@ -74,21 +81,17 @@ func checkAll(services []Service, log func(string, int)) bool {
 	var wg sync.WaitGroup
 	wg.Add(len(services))
 
-	results := make(map[string]bool)
-
+	var allUp bool
+	allUp = true
 	for _, service := range services {
 		go func(service Service) {
 			defer wg.Done()
-			results[service.Name] = CheckUp(service, log)
+
+			// Thread safe?
+			allUp = allUp && CheckUp(service, log)
 		}(service)
 	}
 	wg.Wait()
-
-	var allUp bool
-	allUp = true
-	for _, isUp := range results {
-		allUp = allUp && isUp
-	}
 
 	return allUp
 }
@@ -112,12 +115,14 @@ services:
     interval: 2
     timeout: 3
   down_service:
-    command: test -f /tmp/pass
-    retries: 1
+    command: sleep 2
+    retries: 3
     interval: 2
-    timeout: 3
+    timeout: 1
   other_service:
     command: sleep 1
+    retries: 1
+    interval: 2
     timeout: 3
 `
 
@@ -136,8 +141,23 @@ func main() {
 		if err != nil {
 			panic("could not parse timeout")
 		}
-		services = append(services, Service{Name: name, Timeout: timeout, Command: spec["command"]})
+		retries, err := strconv.Atoi(spec["retries"])
+		if err != nil {
+			panic("could not parse retries")
+		}
+		interval, err := strconv.Atoi(spec["interval"])
+		if err != nil {
+			panic("could not parse interval")
+		}
+		services = append(services,
+			Service{
+				Name:     name,
+				Timeout:  timeout,
+				Command:  spec["command"],
+				Retries:  retries,
+				Interval: interval})
 	}
 
-	checkAll(services, log)
+	results := checkAll(services, log)
+	fmt.Printf("%v", results)
 }
