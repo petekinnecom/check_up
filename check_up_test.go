@@ -215,6 +215,14 @@ func TestLoadServices__all(t *testing.T) {
 	assertServiceNames([]string{"service_0", "service_1", "service_2"}, services, t)
 }
 
+func TestLoadServices__defaultValues(t *testing.T) {
+	services := LoadServices("./test/fixtures/check_up.yml", []string{"service_2"}, log)
+
+	if services[0].Timeout != 2 {
+		t.Error("Timeout should default to 2s but got: ", services[0].Timeout)
+	}
+}
+
 func TestLoadServices__specified(t *testing.T) {
 	serviceNames := []string{"service_0", "service_2"}
 	services := LoadServices("./test/fixtures/check_up.yml", serviceNames, log)

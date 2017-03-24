@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -101,15 +102,17 @@ func checkAll(services []Service, log func(string, int)) bool {
 	return allUp
 }
 
-func waitAll(services []Service, log func(string, int)) {
+func waitAll(services []Service, log func(string, int)) bool {
 	allUp := false
 
 	for !allUp {
 		allUp = checkAll(services, log)
 		if !allUp {
 			log("retrying check up", 1)
+			time.Sleep(1 * time.Second)
 		}
 	}
+	return true
 }
 
 func loadFile(filePath string, log func(string, int)) YamlSpec {
@@ -122,13 +125,6 @@ func loadFile(filePath string, log func(string, int)) YamlSpec {
 	err = yaml.Unmarshal([]byte(fileContents), &yamlSpec)
 	if err != nil {
 		panic("Invalid yml file")
-	}
-
-	for _, service := range yamlSpec.Services {
-		if service.Timeout == 0 {
-			log(fmt.Sprintf("Defaulting timeout to 2s for service %v", service.Name), 1)
-			service.Timeout = 2
-		}
 	}
 	return yamlSpec
 }
@@ -151,19 +147,29 @@ func filterServices(services []Service, serviceNames []string) []Service {
 	}
 }
 
+func (s *Service) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawService Service
+	raw := rawService{Timeout: 2, Retries: 0, Interval: 0} // Put your defaults here
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+	*s = Service(raw)
+	return nil
+}
+
 func LoadServices(filePath string, serviceNames []string, log func(string, int)) []Service {
 	yamlSpec := loadFile(filePath, log)
 	return filterServices(yamlSpec.Services, serviceNames)
 }
 
-func cliStart(serviceNames []string, logLevel int, wait bool, filePath string) {
+func cliStart(serviceNames []string, logLevel int, wait bool, filePath string) bool {
 	log := Logger(logLevel)
 	services := LoadServices(filePath, serviceNames, log)
 
 	if wait {
-		waitAll(services, log)
+		return waitAll(services, log)
 	} else {
-		checkAll(services, log)
+		return checkAll(services, log)
 	}
 }
 
@@ -178,5 +184,10 @@ func main() {
 		logLevel = 1
 	}
 
-	cliStart(flag.Args(), logLevel, *waitPtr, *filePathPtr)
+	allUp := cliStart(flag.Args(), logLevel, *waitPtr, *filePathPtr)
+	if allUp {
+		os.Exit(0)
+	} else {
+		os.Exit(1)
+	}
 }
