@@ -149,7 +149,7 @@ func filterServices(services []Service, serviceNames []string) []Service {
 
 func (s *Service) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type rawService Service
-	raw := rawService{Timeout: 2, Retries: 0, Interval: 0} // Put your defaults here
+	raw := rawService{Timeout: 2, Retries: 0, Interval: 1} // Put your defaults here
 	if err := unmarshal(&raw); err != nil {
 		return err
 	}
