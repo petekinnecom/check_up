@@ -1,0 +1,8 @@
+#! /usr/bin/env bash
+
+set -ex
+
+go fmt
+go build -o _build/check_up
+go test
+ruby integration_test.rb

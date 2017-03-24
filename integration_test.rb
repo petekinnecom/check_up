@@ -5,7 +5,7 @@ require "securerandom"
 class IntegrationTest < Minitest::Test
 
   def setup
-    raise "Compile the binary first" unless File.exist?("./build/check_up")
+    raise "Compile the binary first" unless File.exist?("./_build/check_up")
   end
 
   def test_integration__success
@@ -19,7 +19,7 @@ class IntegrationTest < Minitest::Test
       YAML
       file.flush
 
-      out, status = Open3.capture2e("./build/check_up --file #{file.path}")
+      out, status = Open3.capture2e("./_build/check_up --file #{file.path}")
       assert status == 0
       assert out.empty?, "no news is good news"
     end
@@ -36,7 +36,7 @@ class IntegrationTest < Minitest::Test
       YAML
       file.flush
 
-      out, status = Open3.capture2e("./build/check_up --file #{file.path}")
+      out, status = Open3.capture2e("./_build/check_up --file #{file.path}")
       assert status != 0
       assert out.match(/service_2 | down/)
     end
@@ -55,12 +55,12 @@ class IntegrationTest < Minitest::Test
       file.flush
 
       # ensure our preconditions
-      out, status = Open3.capture2e("./build/check_up --file #{file.path}")
+      out, status = Open3.capture2e("./_build/check_up --file #{file.path}")
       refute status == 0
       assert out.match(/service_1 | down/)
 
       thread = Thread.new {
-        out, status = Open3.capture2e("./build/check_up --file #{file.path} --wait --verbose")
+        out, status = Open3.capture2e("./_build/check_up --file #{file.path} --wait --verbose")
       }
 
       sleep 1 # Magic number to let the executable spin up
