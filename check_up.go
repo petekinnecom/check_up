@@ -165,11 +165,26 @@ func filterServices(services []Service, serviceNames []string) []Service {
 	}
 }
 
+func LoadServices(filePath string, serviceNames []string) []Service {
+	services := loadFile(filePath)
+	return filterServices(services, serviceNames)
+}
+
+func cliStart(serviceNames []string, logLevel int, wait bool, filePath string) {
+	log := Logger(logLevel)
+	services := LoadServices(filePath, serviceNames)
+
+	if wait {
+		waitAll(services, log)
+	} else {
+		checkAll(services, log)
+	}
+}
+
 func main() {
 	filePathPtr := flag.String("file", "check_up.yml", "path to configuration yml")
 	waitPtr := flag.Bool("wait", false, "check services repeatedly until all are up")
 	verbosePtr := flag.Bool("verbose", false, "output more info")
-
 	flag.Parse()
 
 	logLevel := 0
@@ -177,13 +192,5 @@ func main() {
 		logLevel = 1
 	}
 
-	log := Logger(logLevel)
-	services := loadFile(*filePathPtr)
-	services = filterServices(services, flag.Args())
-
-	if *waitPtr {
-		waitAll(services, log)
-	} else {
-		checkAll(services, log)
-	}
+	cliStart(flag.Args(), logLevel, *waitPtr, *filePathPtr)
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"sort"
 	"testing"
 	"time"
 )
@@ -16,6 +17,7 @@ type LogLine struct {
 var logLines []LogLine
 
 func log(s string, i int) {
+	// fmt.Printf("log: %v\n", s)
 	logLines = append(logLines, LogLine{s, i})
 }
 
@@ -128,4 +130,109 @@ func TestCheckUp__retry(t *testing.T) {
 	}
 	assertLog("serviceName | sleep 1 interval", 1, t)
 	assertLog("serviceName | up", 1, t)
+}
+
+func TestCheckAll__allUp(t *testing.T) {
+	resetLog()
+	services := make([]Service, 0)
+
+	services = append(services, Service{
+		Name:     "service_1",
+		Command:  "exit 0",
+		Timeout:  1,
+		Retries:  0,
+		Interval: 0})
+
+	services = append(services, Service{
+		Name:     "service_2",
+		Command:  "exit 0",
+		Timeout:  1,
+		Retries:  0,
+		Interval: 0})
+
+	allUp := checkAll(services, log)
+	if !allUp {
+		t.Error("All services should report up")
+	}
+}
+
+func TestCheckAll__someDown(t *testing.T) {
+	resetLog()
+	services := make([]Service, 0)
+
+	services = append(services, Service{
+		Name:     "service_1",
+		Command:  "exit 0",
+		Timeout:  1,
+		Retries:  0,
+		Interval: 0})
+
+	services = append(services, Service{
+		Name:     "service_2",
+		Command:  "exit 1",
+		Timeout:  1,
+		Retries:  0,
+		Interval: 0})
+
+	allUp := checkAll(services, log)
+	if allUp {
+		t.Error("One service down should make it false")
+	}
+}
+
+func TestCheckAll__concurrency(t *testing.T) {
+	resetLog()
+	services := make([]Service, 0)
+
+	services = append(services, Service{
+		Name:     "service_1",
+		Command:  "sleep 1",
+		Timeout:  3,
+		Retries:  0,
+		Interval: 0})
+
+	services = append(services, Service{
+		Name:     "service_2",
+		Command:  "sleep 1",
+		Timeout:  3,
+		Retries:  0,
+		Interval: 0})
+	start := time.Now()
+	allUp := checkAll(services, log)
+	if !allUp {
+		t.Error("All services are up, this should return true")
+	}
+	elapsed := time.Since(start)
+
+	if elapsed >= (time.Duration(2) * time.Second) {
+		t.Error("checks should run concurrently")
+	}
+}
+
+func TestLoadServices__all(t *testing.T) {
+	services := LoadServices("./test/fixtures/check_up.yml", []string{})
+
+	assertServiceNames([]string{"service_0", "service_1", "service_2"}, services, t)
+}
+
+func TestLoadServices__specified(t *testing.T) {
+	serviceNames := []string{"service_0", "service_2"}
+	services := LoadServices("./test/fixtures/check_up.yml", serviceNames)
+
+	assertServiceNames(serviceNames, services, t)
+}
+
+func assertServiceNames(expectedNames []string, services []Service, t *testing.T) {
+	names := []string{}
+	for _, s := range services {
+		names = append(names, s.Name)
+	}
+	sort.Strings(expectedNames)
+	sort.Strings(names)
+
+	for i := range expectedNames {
+		if expectedNames[i] != names[i] {
+			t.Error("Incorrectly loaded services\n expected: ", expectedNames, "\ngot: ", names)
+		}
+	}
 }

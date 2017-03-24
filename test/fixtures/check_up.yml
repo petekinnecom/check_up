@@ -1,0 +1,10 @@
+services:
+  service_0:
+    command: exit 0
+    retries: 1
+    interval: 2
+    timeout: 3
+  service_1:
+    command: exit 1
+  service_2:
+    command: exit 2
