@@ -3,6 +3,9 @@
 set -ex
 
 go fmt
-go build -o _build/check_up
 go test
+go build -o _build/check_up_test
 ruby integration_test.rb
+
+# gox binary pulled from: https://github.com/mitchellh/gox
+./gox -output "_dist/check_up_{{.OS}}_{{.Arch}}" -os "linux darwin" -arch "386"
