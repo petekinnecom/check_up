@@ -1,12 +1,12 @@
 services:
-  up_service:
+  - name: up_service
     command: sleep 1
     retries: 1
     interval: 2
     timeout: 3
-  down_service:
+  - name: down_service
     command: test -f /tmp/pass
-  other_service:
+  - name: other_service
     command: sleep 1
     retries: 1
     interval: 2

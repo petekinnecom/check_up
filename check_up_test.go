@@ -210,14 +210,14 @@ func TestCheckAll__concurrency(t *testing.T) {
 }
 
 func TestLoadServices__all(t *testing.T) {
-	services := LoadServices("./test/fixtures/check_up.yml", []string{})
+	services := LoadServices("./test/fixtures/check_up.yml", []string{}, log)
 
 	assertServiceNames([]string{"service_0", "service_1", "service_2"}, services, t)
 }
 
 func TestLoadServices__specified(t *testing.T) {
 	serviceNames := []string{"service_0", "service_2"}
-	services := LoadServices("./test/fixtures/check_up.yml", serviceNames)
+	services := LoadServices("./test/fixtures/check_up.yml", serviceNames, log)
 
 	assertServiceNames(serviceNames, services, t)
 }

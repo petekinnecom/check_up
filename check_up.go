@@ -6,7 +6,6 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os/exec"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -17,6 +16,10 @@ type Service struct {
 	Timeout  int
 	Retries  int
 	Interval int
+}
+
+type YamlSpec struct {
+	Services []Service
 }
 
 func execWithTimeout(command string, timeout int, log func(string, int)) bool {
@@ -109,42 +112,25 @@ func waitAll(services []Service, log func(string, int)) {
 	}
 }
 
-func loadFile(filePath string) []Service {
-	yml := make(map[string]map[string]map[string]string)
-
+func loadFile(filePath string, log func(string, int)) YamlSpec {
 	fileContents, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		panic("couldn't read file")
 	}
 
-	err = yaml.Unmarshal([]byte(fileContents), &yml)
+	yamlSpec := YamlSpec{}
+	err = yaml.Unmarshal([]byte(fileContents), &yamlSpec)
 	if err != nil {
-		panic("error")
+		panic("Invalid yml file")
 	}
 
-	services := make([]Service, 0)
-	for name, spec := range yml["services"] {
-		timeout, err := strconv.Atoi(spec["timeout"])
-		if err != nil {
-			timeout = 3
+	for _, service := range yamlSpec.Services {
+		if service.Timeout == 0 {
+			log(fmt.Sprintf("Defaulting timeout to 2s for service %v", service.Name), 1)
+			service.Timeout = 2
 		}
-		retries, err := strconv.Atoi(spec["retries"])
-		if err != nil {
-			retries = 0
-		}
-		interval, err := strconv.Atoi(spec["interval"])
-		if err != nil {
-			interval = 1
-		}
-		services = append(services,
-			Service{
-				Name:     name,
-				Timeout:  timeout,
-				Command:  spec["command"],
-				Retries:  retries,
-				Interval: interval})
 	}
-	return services
+	return yamlSpec
 }
 
 func filterServices(services []Service, serviceNames []string) []Service {
@@ -165,14 +151,14 @@ func filterServices(services []Service, serviceNames []string) []Service {
 	}
 }
 
-func LoadServices(filePath string, serviceNames []string) []Service {
-	services := loadFile(filePath)
-	return filterServices(services, serviceNames)
+func LoadServices(filePath string, serviceNames []string, log func(string, int)) []Service {
+	yamlSpec := loadFile(filePath, log)
+	return filterServices(yamlSpec.Services, serviceNames)
 }
 
 func cliStart(serviceNames []string, logLevel int, wait bool, filePath string) {
 	log := Logger(logLevel)
-	services := LoadServices(filePath, serviceNames)
+	services := LoadServices(filePath, serviceNames, log)
 
 	if wait {
 		waitAll(services, log)
